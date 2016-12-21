@@ -182,8 +182,8 @@ type OrmTag struct {
 }
 
 // String returns the source code string for the Table struct
-func (tb *Table) String() string {
-	rv := fmt.Sprintf("type %s struct {\n", camelCase(tb.Name))
+func (tb *Table) String(prefix string) string {
+	rv := fmt.Sprintf("type %s struct {\n", camelCase(tb.Name, prefix))
 	for _, v := range tb.Columns {
 		rv += v.String() + "\n"
 	}
@@ -255,7 +255,7 @@ func (tag *OrmTag) String() string {
 	return fmt.Sprintf("`orm:\"%s\"`", strings.Join(ormOptions, ";"))
 }
 
-func generateAppcode(driver, connStr, level, tables, currpath string) {
+func generateAppcode(driver, connStr, level, tables, currpath string, prefix string) {
 	var mode byte
 	switch level {
 	case "1":
@@ -282,12 +282,12 @@ func generateAppcode(driver, connStr, level, tables, currpath string) {
 	default:
 		logger.Fatal("Unknown database driver. Must be either \"mysql\", \"postgres\" or \"sqlite\"")
 	}
-	gen(driver, connStr, mode, selectedTables, currpath)
+	gen(driver, connStr, mode, selectedTables, currpath, prefix)
 }
 
 // Generate takes table, column and foreign key information from database connection
 // and generate corresponding golang source files
-func gen(dbms, connStr string, mode byte, selectedTableNames map[string]bool, apppath string) {
+func gen(dbms, connStr string, mode byte, selectedTableNames map[string]bool, apppath string, prefix string) {
 	db, err := sql.Open(dbms, connStr)
 	if err != nil {
 		logger.Fatalf("Could not connect to '%s' database using '%s': %s", dbms, connStr, err)
@@ -303,7 +303,7 @@ func gen(dbms, connStr string, mode byte, selectedTableNames map[string]bool, ap
 		mvcPath.RouterPath = path.Join(apppath, "routers")
 		createPaths(mode, mvcPath)
 		pkgPath := getPackagePath(apppath)
-		writeSourceFiles(pkgPath, tables, mode, mvcPath, selectedTableNames)
+		writeSourceFiles(pkgPath, tables, mode, mvcPath, selectedTableNames, prefix)
 	} else {
 		logger.Fatalf("Generating app code from '%s' database is not supported yet.", dbms)
 	}
@@ -422,7 +422,7 @@ func (mysqlDB *MysqlDB) GetColumns(db *sql.DB, table *Table, blackList map[strin
 
 		// create a column
 		col := new(Column)
-		col.Name = camelCase(colName)
+		col.Name = camelCase(colName, "")
 		col.Type, err = mysqlDB.GetGoDataType(dataType)
 		if err != nil {
 			logger.Fatalf("%s", err)
@@ -449,8 +449,8 @@ func (mysqlDB *MysqlDB) GetColumns(db *sql.DB, table *Table, blackList map[strin
 			if isFk && !isBl {
 				tag.RelFk = true
 				refStructName := fkCol.RefTable
-				col.Name = camelCase(colName)
-				col.Type = "*" + camelCase(refStructName)
+				col.Name = camelCase(colName, "")
+				col.Type = "*" + camelCase(refStructName, "")
 			} else {
 				// if the name of column is Id, and it's not primary key
 				if colName == "id" {
@@ -623,7 +623,7 @@ func (postgresDB *PostgresDB) GetColumns(db *sql.DB, table *Table, blackList map
 			string(colNameBytes), string(dataTypeBytes), string(columnTypeBytes), string(isNullableBytes), string(columnDefaultBytes), string(extraBytes)
 		// Create a column
 		col := new(Column)
-		col.Name = camelCase(colName)
+		col.Name = camelCase(colName, "")
 		col.Type, err = postgresDB.GetGoDataType(dataType)
 		if err != nil {
 			logger.Fatalf("%s", err)
@@ -650,8 +650,8 @@ func (postgresDB *PostgresDB) GetColumns(db *sql.DB, table *Table, blackList map
 			if isFk && !isBl {
 				tag.RelFk = true
 				refStructName := fkCol.RefTable
-				col.Name = camelCase(colName)
-				col.Type = "*" + camelCase(refStructName)
+				col.Name = camelCase(colName, "")
+				col.Type = "*" + camelCase(refStructName, "")
 			} else {
 				// if the name of column is Id, and it's not primary key
 				if colName == "id" {
@@ -714,23 +714,23 @@ func createPaths(mode byte, paths *MvcPath) {
 // writeSourceFiles generates source files for model/controller/router
 // It will wipe the following directories and recreate them:./models, ./controllers, ./routers
 // Newly geneated files will be inside these folders.
-func writeSourceFiles(pkgPath string, tables []*Table, mode byte, paths *MvcPath, selectedTables map[string]bool) {
+func writeSourceFiles(pkgPath string, tables []*Table, mode byte, paths *MvcPath, selectedTables map[string]bool, prefix string) {
 	if (OModel & mode) == OModel {
 		logger.Info("Creating model files...")
-		writeModelFiles(tables, paths.ModelPath, selectedTables)
+		writeModelFiles(tables, paths.ModelPath, selectedTables, prefix)
 	}
 	if (OController & mode) == OController {
 		logger.Info("Creating controller files...")
-		writeControllerFiles(tables, paths.ControllerPath, selectedTables, pkgPath)
+		writeControllerFiles(tables, paths.ControllerPath, selectedTables, pkgPath, prefix)
 	}
 	if (ORouter & mode) == ORouter {
 		logger.Info("Creating router files...")
-		writeRouterFile(tables, paths.RouterPath, selectedTables, pkgPath)
+		writeRouterFile(tables, paths.RouterPath, selectedTables, pkgPath, prefix)
 	}
 }
 
 // writeModelFiles generates model files
-func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bool) {
+func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bool, prefix string) {
 	w := NewColorWriter(os.Stdout)
 
 	for _, tb := range tables {
@@ -740,7 +740,7 @@ func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bo
 				continue
 			}
 		}
-		filename := getFileName(tb.Name)
+		filename := getFileName(tb.Name, prefix)
 		fpath := path.Join(mPath, filename+".go")
 		var f *os.File
 		var err error
@@ -769,8 +769,8 @@ func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bo
 		} else {
 			template = ModelTPL
 		}
-		fileStr := strings.Replace(template, "{{modelStruct}}", tb.String(), 1)
-		fileStr = strings.Replace(fileStr, "{{modelName}}", camelCase(tb.Name), -1)
+		fileStr := strings.Replace(template, "{{modelStruct}}", tb.String(prefix), 1)
+		fileStr = strings.Replace(fileStr, "{{modelName}}", camelCase(tb.Name, prefix), -1)
 		fileStr = strings.Replace(fileStr, "{{tableName}}", tb.Name, -1)
 
 		// If table contains time field, import time.Time package
@@ -792,7 +792,7 @@ func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bo
 }
 
 // writeControllerFiles generates controller files
-func writeControllerFiles(tables []*Table, cPath string, selectedTables map[string]bool, pkgPath string) {
+func writeControllerFiles(tables []*Table, cPath string, selectedTables map[string]bool, pkgPath string, prefix string) {
 	w := NewColorWriter(os.Stdout)
 
 	for _, tb := range tables {
@@ -805,7 +805,7 @@ func writeControllerFiles(tables []*Table, cPath string, selectedTables map[stri
 		if tb.Pk == "" {
 			continue
 		}
-		filename := getFileName(tb.Name)
+		filename := getFileName(tb.Name, prefix)
 		fpath := path.Join(cPath, filename+".go")
 		var f *os.File
 		var err error
@@ -828,7 +828,7 @@ func writeControllerFiles(tables []*Table, cPath string, selectedTables map[stri
 				continue
 			}
 		}
-		fileStr := strings.Replace(CtrlTPL, "{{ctrlName}}", camelCase(tb.Name), -1)
+		fileStr := strings.Replace(CtrlTPL, "{{ctrlName}}", camelCase(tb.Name, prefix), -1)
 		fileStr = strings.Replace(fileStr, "{{pkgPath}}", pkgPath, -1)
 		if _, err := f.WriteString(fileStr); err != nil {
 			logger.Fatalf("Could not write controller file to '%s': %s", fpath, err)
@@ -840,7 +840,7 @@ func writeControllerFiles(tables []*Table, cPath string, selectedTables map[stri
 }
 
 // writeRouterFile generates router file
-func writeRouterFile(tables []*Table, rPath string, selectedTables map[string]bool, pkgPath string) {
+func writeRouterFile(tables []*Table, rPath string, selectedTables map[string]bool, pkgPath string, prefix string) {
 	w := NewColorWriter(os.Stdout)
 
 	var nameSpaces []string
@@ -856,7 +856,7 @@ func writeRouterFile(tables []*Table, rPath string, selectedTables map[string]bo
 		}
 		// Add namespaces
 		nameSpace := strings.Replace(NamespaceTPL, "{{nameSpace}}", tb.Name, -1)
-		nameSpace = strings.Replace(nameSpace, "{{ctrlName}}", camelCase(tb.Name), -1)
+		nameSpace = strings.Replace(nameSpace, "{{ctrlName}}", camelCase(tb.Name, prefix), -1)
 		nameSpaces = append(nameSpaces, nameSpace)
 	}
 	// Add export controller
@@ -939,13 +939,18 @@ func extractDecimal(colType string) (digits string, decimals string) {
 	return
 }
 
-func getFileName(tbName string) (filename string) {
+func getFileName(tbName string, prefix string) (filename string) {
 	// avoid test file
 	filename = tbName
 	for strings.HasSuffix(filename, "_test") {
 		pos := strings.LastIndex(filename, "_")
 		filename = filename[:pos] + filename[pos+1:]
 	}
+
+	if prefix != "" && strings.HasPrefix(filename, prefix) {
+		filename = strings.TrimPrefix(filename, prefix)
+	}
+
 	return
 }
 

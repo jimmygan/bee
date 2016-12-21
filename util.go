@@ -210,7 +210,11 @@ func camelString(s string) string {
 
 // camelCase converts a _ delimited string to camel case
 // e.g. very_important_person => VeryImportantPerson
-func camelCase(in string) string {
+// e.g. prefix=tb_ : tb_users => Users
+func camelCase(in string, prefix string) string {
+	if prefix != "" && strings.HasPrefix(in, prefix) {
+		in = strings.TrimPrefix(in, prefix)
+	}
 	tokens := strings.Split(in, "_")
 	for i := range tokens {
 		tokens[i] = strings.Title(strings.Trim(tokens[i], " "))

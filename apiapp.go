@@ -558,6 +558,10 @@ func createapi(cmd *Command, args []string) int {
 	if conn == "" {
 	}
 
+	if prefix == "" {
+
+	}
+
 	logger.Info("Creating API...")
 
 	os.MkdirAll(apppath, 0755)
@@ -592,7 +596,7 @@ func createapi(cmd *Command, args []string) int {
 		logger.Infof("Using '%s' as 'driver'", driver)
 		logger.Infof("Using '%s' as 'conn'", conn)
 		logger.Infof("Using '%s' as 'tables'", tables)
-		generateAppcode(string(driver), string(conn), "3", string(tables), apppath)
+		generateAppcode(string(driver), string(conn), "3", string(tables), apppath, string(prefix))
 	} else {
 		os.Mkdir(path.Join(apppath, "models"), 0755)
 		fmt.Fprintf(output, "\t%s%screate%s\t %s%s\n", "\x1b[32m", "\x1b[1m", "\x1b[21m", path.Join(apppath, "models"), "\x1b[0m")

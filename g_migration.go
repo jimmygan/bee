@@ -199,7 +199,7 @@ func generateMigration(mname, upsql, downsql, curpath string) {
 	fpath := path.Join(migrationFilePath, fmt.Sprintf("%s_%s.go", today, mname))
 	if f, err := os.OpenFile(fpath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666); err == nil {
 		defer CloseFile(f)
-		content := strings.Replace(MigrationTPL, "{{StructName}}", camelCase(mname)+"_"+today, -1)
+		content := strings.Replace(MigrationTPL, "{{StructName}}", camelCase(mname, "")+"_"+today, -1)
 		content = strings.Replace(content, "{{CurrTime}}", today, -1)
 		content = strings.Replace(content, "{{UpSQL}}", upsql, -1)
 		content = strings.Replace(content, "{{DownSQL}}", downsql, -1)

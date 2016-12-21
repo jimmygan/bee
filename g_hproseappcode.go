@@ -101,7 +101,7 @@ func writeHproseModelFiles(tables []*Table, mPath string, selectedTables map[str
 				continue
 			}
 		}
-		filename := getFileName(tb.Name)
+		filename := getFileName(tb.Name, "")
 		fpath := path.Join(mPath, filename+".go")
 		var f *os.File
 		var err error
@@ -129,10 +129,10 @@ func writeHproseModelFiles(tables []*Table, mPath string, selectedTables map[str
 			template = HproseStructModelTPL
 		} else {
 			template = HproseModelTPL
-			hproseAddFunctions = append(hproseAddFunctions, strings.Replace(HproseAddFunction, "{{modelName}}", camelCase(tb.Name), -1))
+			hproseAddFunctions = append(hproseAddFunctions, strings.Replace(HproseAddFunction, "{{modelName}}", camelCase(tb.Name, ""), -1))
 		}
-		fileStr := strings.Replace(template, "{{modelStruct}}", tb.String(), 1)
-		fileStr = strings.Replace(fileStr, "{{modelName}}", camelCase(tb.Name), -1)
+		fileStr := strings.Replace(template, "{{modelStruct}}", tb.String(""), 1)
+		fileStr = strings.Replace(fileStr, "{{modelName}}", camelCase(tb.Name, ""), -1)
 		// if table contains time field, import time.Time package
 		timePkg := ""
 		importTimePkg := ""

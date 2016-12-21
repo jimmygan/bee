@@ -52,7 +52,7 @@ var cmdGenerate = &Command{
 
   ▶ {{"To generate appcode based on an existing database:"|bold}}
 
-     $ bee generate appcode [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3]
+     $ bee generate appcode [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3] [-prefix="tb_"]
 `,
 	PreRun: func(cmd *Command, args []string) { ShowShortVersionBanner() },
 	Run:    generateCode,
@@ -63,6 +63,7 @@ var conn docValue
 var level docValue
 var tables docValue
 var fields docValue
+var prefix docValue
 
 func init() {
 	cmdGenerate.Flag.Var(&tables, "tables", "List of table names separated by a comma.")
@@ -70,6 +71,7 @@ func init() {
 	cmdGenerate.Flag.Var(&conn, "conn", "Connection string used by the driver to connect to a database instance.")
 	cmdGenerate.Flag.Var(&level, "level", "Either 1, 2 or 3. i.e. 1=models; 2=models and controllers; 3=models, controllers and routers.")
 	cmdGenerate.Flag.Var(&fields, "fields", "List of table fields.")
+	cmdGenerate.Flag.Var(&prefix, "prefix", "Table prefix like \"tb_\" .")
 }
 
 func generateCode(cmd *Command, args []string) int {
@@ -145,11 +147,13 @@ func generateCode(cmd *Command, args []string) int {
 		if level == "" {
 			level = "3"
 		}
+
 		logger.Infof("Using '%s' as 'driver'", driver)
 		logger.Infof("Using '%s' as 'conn'", conn)
 		logger.Infof("Using '%s' as 'tables'", tables)
 		logger.Infof("Using '%s' as 'level'", level)
-		generateAppcode(driver.String(), conn.String(), level.String(), tables.String(), currpath)
+		logger.Infof("Using '%s' as 'prefix'", prefix)
+		generateAppcode(driver.String(), conn.String(), level.String(), tables.String(), currpath, prefix.String())
 	case "migration":
 		if len(args) < 2 {
 			logger.Fatal("Wrong number of arguments. Run: bee help generate")
