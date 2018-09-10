@@ -1,11 +1,8 @@
 {
 	"version": 0,
-	"gopm": {
-		"enable": false,
-		"install": false
-	},
 	"go_install": false,
-	"watch_ext": [],
+	"watch_ext": [".go"],
+	"watch_ext_static": [".html", ".tpl", ".js", ".css"],
 	"dir_structure": {
 		"watch_all": false,
 		"controllers": "",
@@ -16,5 +13,6 @@
 	"envs": [],
 	"database": {
 		"driver": "mysql"
-	}
+	},
+	"enable_reload": false
 }
